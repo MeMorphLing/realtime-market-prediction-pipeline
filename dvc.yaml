@@ -1,0 +1,51 @@
+stages:
+  ingest:
+    cmd: >
+      python -m src.ingestion.yahoo_finance &&
+      python -m src.ingestion.reuters_rss &&
+      python -m src.ingestion.reddit_scraper &&
+      python -m src.ingestion.twitter_scraper
+    deps:
+      - src/ingestion
+    outs:
+      - data/raw/prices
+      - data/raw/news
+      - data/raw/social
+
+  sentiment:
+    cmd: >
+      python -c "from src.sentiment.finbert import classify_finbert;
+      from src.sentiment.vader import classify_vader;
+      print('Sentiment stage placeholder — wire up your inputs here')"
+    deps:
+      - src/sentiment
+      - data/raw/news
+      - data/raw/social
+    outs:
+      - data/processed/sentiment
+
+  features:
+    cmd: python -m src.features.time_series
+    deps:
+      - src/features/time_series.py
+      - data/raw/prices
+      - data/processed/sentiment
+    outs:
+      - data/features
+
+  train:
+    cmd: python -m src.models.train
+    deps:
+      - src/models
+      - data/features
+    outs:
+      - mlruns/checkpoints
+
+  evaluate:
+    cmd: python -m src.evaluation.metrics
+    deps:
+      - src/evaluation/metrics.py
+      - mlruns/checkpoints
+    metrics:
+      - mlruns/metrics.json:
+          cache: false

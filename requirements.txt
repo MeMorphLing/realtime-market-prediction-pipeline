@@ -1,0 +1,39 @@
+# Data ingestion
+yfinance>=0.2.40
+feedparser>=6.0.10
+praw>=7.7.1
+tweepy>=4.14.0
+
+# Data processing
+pandas>=2.1.0
+pyarrow>=14.0.0
+numpy>=1.26.0
+
+# Deep learning
+torch>=2.1.0
+transformers>=4.36.0
+
+# NLP / sentiment
+nltk>=3.8.1
+
+# Classical ML / metrics
+scikit-learn>=1.3.0
+
+# Experiment tracking
+mlflow>=2.9.0
+
+# Orchestration
+apache-airflow>=2.8.0
+
+# API
+fastapi>=0.108.0
+uvicorn[standard]>=0.25.0
+pydantic>=2.5.0
+
+# Data versioning
+dvc>=3.30.0
+
+# Utilities
+python-dotenv>=1.0.0
+matplotlib>=3.8.0
+seaborn>=0.13.0

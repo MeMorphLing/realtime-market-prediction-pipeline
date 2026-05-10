@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Prediction Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header class="app-header">
+        <h1>Market Prediction Dashboard</h1>
+        <p class="subtitle">Real-time direction forecasts powered by sequential deep learning</p>
+    </header>
+
+    <main class="container">
+        <section class="control-panel card">
+            <label for="ticker-input">Ticker</label>
+            <div class="input-row">
+                <input id="ticker-input" type="text" placeholder="e.g. AAPL" maxlength="10" />
+                <button id="predict-btn" type="button">Predict</button>
+            </div>
+            <p id="status-line" class="status"></p>
+        </section>
+
+        <section class="grid">
+            <div class="card sentiment-card">
+                <h2>Sentiment</h2>
+                <div class="bar-row">
+                    <span class="bar-label">Positive</span>
+                    <div class="bar-track"><div id="bar-positive" class="bar-fill bar-pos"></div></div>
+                    <span id="val-positive" class="bar-value">0%</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Neutral</span>
+                    <div class="bar-track"><div id="bar-neutral" class="bar-fill bar-neu"></div></div>
+                    <span id="val-neutral" class="bar-value">0%</span>
+                </div>
+                <div class="bar-row">
+                    <span class="bar-label">Negative</span>
+                    <div class="bar-track"><div id="bar-negative" class="bar-fill bar-neg"></div></div>
+                    <span id="val-negative" class="bar-value">0%</span>
+                </div>
+                <p id="sentiment-updated" class="muted"></p>
+            </div>
+
+            <div class="card prediction-card">
+                <h2>Prediction</h2>
+                <div id="prediction-arrow" class="arrow">—</div>
+                <div id="prediction-direction" class="direction">No prediction yet</div>
+                <div class="confidence">
+                    <span>Confidence:</span>
+                    <strong id="prediction-confidence">—</strong>
+                </div>
+                <div class="model-tag">Model: <span id="prediction-model">—</span></div>
+            </div>
+        </section>
+
+        <section class="card history-card">
+            <h2>Recent predictions</h2>
+            <table id="history-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Ticker</th>
+                        <th>Direction</th>
+                        <th>Confidence</th>
+                        <th>Model</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    <tr><td colspan="5" class="muted">No predictions yet.</td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
