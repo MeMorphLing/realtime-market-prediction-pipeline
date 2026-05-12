@@ -7,10 +7,6 @@ import logging
 import os
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")  # noqa: E402
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
@@ -25,6 +21,8 @@ from sklearn.metrics import (
 )
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
+
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 load_dotenv()
 
@@ -104,6 +102,10 @@ def plot_metrics(metrics_dict: dict, output_path: Path | None = None) -> Path:
     if not metrics_dict:
         logger.warning("Empty metrics dict; skipping plot")
         return out
+
+    # Lazy import keeps matplotlib (and its Agg backend env var) off the
+    # module-level import block — required to keep flake8 E402 clean.
+    import matplotlib.pyplot as plt
 
     metric_keys = ["accuracy", "f1_score", "precision", "recall"]
     model_names = list(metrics_dict.keys())
