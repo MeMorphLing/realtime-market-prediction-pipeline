@@ -1,0 +1,47 @@
+schema: '2.0'
+stages:
+  train:
+    cmd: python -m src.models.train
+    deps:
+    - path: data/features
+      hash: md5
+      md5: 293f8759cb94d6abff63e7d4cd16ad61.dir
+      size: 106654
+      nfiles: 7
+    - path: src/models
+      hash: md5
+      md5: f1351530c14b5668c355e6cb574b6c9f.dir
+      size: 14589
+      nfiles: 5
+    outs:
+    - path: checkpoints
+      hash: md5
+      md5: 36b2b893f25ec68a2f626ef2be42947f.dir
+      size: 1488911
+      nfiles: 3
+  evaluate:
+    cmd: python -m src.evaluation.metrics
+    deps:
+    - path: checkpoints
+      hash: md5
+      md5: 36b2b893f25ec68a2f626ef2be42947f.dir
+      size: 1488911
+      nfiles: 3
+    - path: data/features
+      hash: md5
+      md5: 293f8759cb94d6abff63e7d4cd16ad61.dir
+      size: 106654
+      nfiles: 7
+    - path: src/evaluation/metrics.py
+      hash: md5
+      md5: b1332a802629afaa1e6227a8d54463c1
+      size: 6459
+    outs:
+    - path: reports/comparison.png
+      hash: md5
+      md5: 24b2af95c8e1123423000194b271ea3b
+      size: 19404
+    - path: reports/metrics.json
+      hash: md5
+      md5: bb32cbb663994fe774eec84744df082b
+      size: 912

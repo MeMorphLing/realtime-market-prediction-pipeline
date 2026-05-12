@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
 MLRUNS_DIR = Path("mlruns")
+CHECKPOINTS_DIR = Path(os.getenv("CHECKPOINTS_DIR", "checkpoints"))
 TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
 
 
@@ -66,7 +67,7 @@ def train_model(
     Returns:
         Dict with the best epoch's validation metrics.
     """
-    ckpt_dir = Path(checkpoint_dir) if checkpoint_dir else MLRUNS_DIR / "checkpoints"
+    ckpt_dir = Path(checkpoint_dir) if checkpoint_dir else CHECKPOINTS_DIR
     ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     device = _device()
@@ -222,3 +223,42 @@ def run_all_experiments(
             results[name] = {"error": "training_failed"}
 
     return results
+
+
+def _load_windows_from_dir(features_dir: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load every ``*_windows.parquet`` from ``features_dir`` and stack them."""
+    files = sorted(features_dir.glob("*_windows.parquet"))
+    if not files:
+        raise FileNotFoundError(f"No *_windows.parquet under {features_dir}")
+    import pandas as pd
+
+    Xs, ys = [], []
+    for f in files:
+        df = pd.read_parquet(f)
+        windows = []
+        for row in df["X"]:
+            # row is a (window_size,) object array of (n_features,) arrays
+            windows.append(np.stack([np.asarray(step, dtype=np.float32) for step in row]))
+        Xs.append(np.stack(windows))
+        ys.append(np.asarray(df["y"].tolist(), dtype=np.int64))
+    return np.concatenate(Xs, axis=0), np.concatenate(ys, axis=0)
+
+
+def main() -> None:
+    """DVC entry point. Loads features, splits 80/20, runs all experiments."""
+    features_dir = Path(os.getenv("FEATURES_DIR", "data/features"))
+    epochs = int(os.getenv("TRAIN_EPOCHS", "10"))
+    batch_size = int(os.getenv("TRAIN_BATCH_SIZE", "32"))
+
+    X, y = _load_windows_from_dir(features_dir)
+    logger.info("Loaded %d windows of shape %s from %s", len(X), X.shape[1:], features_dir)
+
+    split = int(len(X) * 0.8)
+    results = run_all_experiments(
+        X[:split], y[:split], X[split:], y[split:], epochs=epochs, batch_size=batch_size
+    )
+    logger.info("Best metrics: %s", results)
+
+
+if __name__ == "__main__":
+    main()

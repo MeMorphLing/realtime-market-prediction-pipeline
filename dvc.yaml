@@ -39,13 +39,17 @@ stages:
       - src/models
       - data/features
     outs:
-      - mlruns/checkpoints
+      - checkpoints
 
   evaluate:
     cmd: python -m src.evaluation.metrics
     deps:
       - src/evaluation/metrics.py
-      - mlruns/checkpoints
+      - checkpoints
+      - data/features
     metrics:
-      - mlruns/metrics.json:
+      - reports/metrics.json:
+          cache: false
+    plots:
+      - reports/comparison.png:
           cache: false

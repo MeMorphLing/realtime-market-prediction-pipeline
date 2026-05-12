@@ -1,0 +1,6 @@
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=market-bot/1.0
+TWITTER_BEARER_TOKEN=your_twitter_bearer_token
+MLFLOW_TRACKING_URI=http://localhost:5000
+AIRFLOW_UID=50000

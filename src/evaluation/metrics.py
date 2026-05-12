@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from pathlib import Path
 
 import matplotlib
@@ -10,6 +12,7 @@ import matplotlib
 matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 from dotenv import load_dotenv
 from sklearn.metrics import (
@@ -21,7 +24,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 load_dotenv()
 
@@ -29,6 +32,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
 MLRUNS_DIR = Path("mlruns")
+REPORTS_DIR = Path("reports")
 
 
 def evaluate_model(model: nn.Module, test_loader: DataLoader) -> dict:
@@ -131,3 +135,63 @@ def plot_metrics(metrics_dict: dict, output_path: Path | None = None) -> Path:
 
     logger.info("Comparison plot saved to %s", out)
     return out
+
+
+def _load_windows_from_dir(features_dir: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Concatenate every ``*_windows.parquet`` under ``features_dir``."""
+    files = sorted(features_dir.glob("*_windows.parquet"))
+    if not files:
+        raise FileNotFoundError(f"No *_windows.parquet under {features_dir}")
+    Xs, ys = [], []
+    for f in files:
+        df = pd.read_parquet(f)
+        windows = []
+        for row in df["X"]:
+            windows.append(np.stack([np.asarray(step, dtype=np.float32) for step in row]))
+        Xs.append(np.stack(windows))
+        ys.append(np.asarray(df["y"].tolist(), dtype=np.int64))
+    return np.concatenate(Xs, axis=0), np.concatenate(ys, axis=0)
+
+
+def main() -> None:
+    """DVC entry point. Loads features + checkpoints, writes metrics.json + plot."""
+    from src.models import build_gru, build_lstm, build_rnn
+
+    features_dir = Path(os.getenv("FEATURES_DIR", "data/features"))
+    checkpoints_dir = Path(os.getenv("CHECKPOINTS_DIR", "checkpoints"))
+    reports_dir = Path(os.getenv("REPORTS_DIR", "reports"))
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    X, y = _load_windows_from_dir(features_dir)
+    split = int(len(X) * 0.8)
+    X_val, y_val = X[split:], y[split:]
+    loader = DataLoader(
+        TensorDataset(
+            torch.tensor(X_val, dtype=torch.float32),
+            torch.tensor(y_val, dtype=torch.float32).unsqueeze(-1),
+        ),
+        batch_size=32,
+    )
+
+    factories = {"rnn": build_rnn, "lstm": build_lstm, "gru": build_gru}
+    all_metrics: dict[str, dict] = {}
+    for name, factory in factories.items():
+        ckpt = checkpoints_dir / f"{name}_best.pt"
+        if not ckpt.exists():
+            logger.warning("No checkpoint at %s — skipping %s", ckpt, name)
+            continue
+        model = factory(input_size=X.shape[-1])
+        model.load_state_dict(torch.load(ckpt, map_location="cpu"))
+        all_metrics[name] = evaluate_model(model, loader)
+
+    metrics_path = reports_dir / "metrics.json"
+    with metrics_path.open("w", encoding="utf-8") as fp:
+        json.dump(all_metrics, fp, indent=2)
+    logger.info("Wrote metrics to %s", metrics_path)
+
+    if all_metrics:
+        plot_metrics(all_metrics, output_path=reports_dir / "comparison.png")
+
+
+if __name__ == "__main__":
+    main()

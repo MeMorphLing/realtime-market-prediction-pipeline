@@ -117,7 +117,7 @@ def build_time_series(
 
     merged = prices.merge(sentiment, on="timestamp", how="left")
     for col in ["avg_sentiment", "positive_ratio", "negative_ratio", "article_count"]:
-        merged[col] = merged[col].fillna(0.0)
+        merged[col] = pd.to_numeric(merged[col], errors="coerce").fillna(0.0)
 
     merged["direction"] = (merged["close"].shift(-1) > merged["close"]).astype(int)
     merged = merged.dropna(subset=["direction"]).reset_index(drop=True)

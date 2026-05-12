@@ -49,6 +49,12 @@ htmlcov/
 mlruns/
 mlartifacts/
 
+# Model checkpoints (versioned via DVC)
+checkpoints/
+
+# DVC reports (metrics live here so they aren't ignored as part of mlruns/)
+reports/
+
 # DVC
 .dvc/cache
 .dvc/tmp
@@ -66,3 +72,4 @@ logs/
 airflow.db
 airflow-webserver.pid
 standalone_admin_password.txt
+/checkpoints

@@ -17,6 +17,7 @@ import torch
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.models import build_gru, build_lstm, build_rnn
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
 MLRUNS_DIR = Path(os.getenv("MLRUNS_DIR", "mlruns"))
+CHECKPOINTS_DIR = Path(os.getenv("CHECKPOINTS_DIR", "checkpoints"))
 DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "lstm")
 DEFAULT_INPUT_SIZE = int(os.getenv("MODEL_INPUT_SIZE", "9"))
 
@@ -91,7 +93,10 @@ def _load_checkpoint(name: str, input_size: int = DEFAULT_INPUT_SIZE) -> Optiona
         logger.warning("Unknown model %s", name)
         return None
 
-    ckpt_path = MLRUNS_DIR / "checkpoints" / f"{name}_best.pt"
+    ckpt_path = CHECKPOINTS_DIR / f"{name}_best.pt"
+    legacy_path = MLRUNS_DIR / "checkpoints" / f"{name}_best.pt"
+    if not ckpt_path.exists() and legacy_path.exists():
+        ckpt_path = legacy_path
     model = factory(input_size=input_size)
     if not ckpt_path.exists():
         logger.info("No checkpoint at %s; using untrained %s weights", ckpt_path, name)
@@ -192,3 +197,10 @@ def list_models() -> list[ModelInfo]:
             )
         )
     return out
+
+
+# Serve the dashboard at "/". Mounted last so API routes match first.
+_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+if _FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(_FRONTEND_DIR), html=True), name="frontend")
+    logger.info("Serving frontend from %s at /", _FRONTEND_DIR)
