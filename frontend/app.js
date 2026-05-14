@@ -1,6 +1,6 @@
-const API_BASE_URL = "http://localhost:8000";
-const WINDOW_SIZE = 30;
-const N_FEATURES = 9;
+// Empty base = same-origin (works when served by FastAPI at :8000).
+// Override here if hosting the static files elsewhere.
+const API_BASE_URL = window.API_BASE_URL || "";
 
 const els = {
     tickerInput: document.getElementById("ticker-input"),
@@ -18,6 +18,7 @@ const els = {
     valNegative: document.getElementById("val-negative"),
     sentimentUpdated: document.getElementById("sentiment-updated"),
     historyBody: document.getElementById("history-body"),
+    tickerHint: document.getElementById("ticker-hint"),
 };
 
 const history = [];
@@ -32,25 +33,17 @@ function setLoading(isLoading) {
     els.predictBtn.textContent = isLoading ? "Loading…" : "Predict";
 }
 
-function buildDummyWindow() {
-    const window = [];
-    for (let t = 0; t < WINDOW_SIZE; t++) {
-        const row = [];
-        for (let f = 0; f < N_FEATURES; f++) row.push(0);
-        window.push(row);
-    }
-    return window;
-}
-
 async function predict(ticker) {
-    const url = `${API_BASE_URL}/predict`;
-    const body = { ticker, window_data: buildDummyWindow() };
-    const res = await fetch(url, {
+    // window_data omitted → API loads the latest features for this ticker from disk.
+    const res = await fetch(`${API_BASE_URL}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ticker }),
     });
-    if (!res.ok) throw new Error(`Predict failed (${res.status})`);
+    if (!res.ok) {
+        const detail = await res.json().catch(() => ({}));
+        throw new Error(detail.detail || `Predict failed (${res.status})`);
+    }
     return res.json();
 }
 
@@ -58,6 +51,19 @@ async function getSentiment(ticker) {
     const res = await fetch(`${API_BASE_URL}/sentiment/${encodeURIComponent(ticker)}`);
     if (!res.ok) throw new Error(`Sentiment failed (${res.status})`);
     return res.json();
+}
+
+async function loadAvailableTickers() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/tickers`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (els.tickerHint && data.tickers && data.tickers.length) {
+            els.tickerHint.textContent = `Available: ${data.tickers.join(", ")}`;
+        }
+    } catch (err) {
+        console.warn("Could not load ticker list", err);
+    }
 }
 
 function renderPrediction(p) {
@@ -137,3 +143,5 @@ els.predictBtn.addEventListener("click", onPredictClick);
 els.tickerInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") onPredictClick();
 });
+
+loadAvailableTickers();
