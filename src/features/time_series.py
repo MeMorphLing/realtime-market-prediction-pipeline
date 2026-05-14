@@ -61,15 +61,15 @@ def _load_sentiment(sentiment_dir: Path) -> pd.DataFrame:
     return df.dropna(subset=["timestamp"])
 
 
-def _aggregate_sentiment_hourly(sentiment_df: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate per-document sentiment to hourly bins."""
+def _aggregate_sentiment(sentiment_df: pd.DataFrame, freq: str = "1h") -> pd.DataFrame:
+    """Aggregate per-document sentiment into bins of the given frequency."""
     if sentiment_df.empty:
         return pd.DataFrame(
             columns=["timestamp", "avg_sentiment", "positive_ratio", "negative_ratio", "article_count"]
         )
 
     df = sentiment_df.copy()
-    df["timestamp"] = df["timestamp"].dt.floor("1h")
+    df["timestamp"] = df["timestamp"].dt.floor(freq)
     df["is_pos"] = (df["label"] == "positive").astype(int)
     df["is_neg"] = (df["label"] == "negative").astype(int)
 
@@ -82,12 +82,25 @@ def _aggregate_sentiment_hourly(sentiment_df: pd.DataFrame) -> pd.DataFrame:
     return grouped.reset_index()
 
 
+def _normalize_columns(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Per-ticker z-score normalization. std=0 columns become 0.0 (constant)."""
+    out = df.copy()
+    for col in columns:
+        series = pd.to_numeric(out[col], errors="coerce").fillna(0.0)
+        std = float(series.std(ddof=0))
+        mean = float(series.mean())
+        out[col] = ((series - mean) / std) if std > 1e-9 else 0.0
+    return out
+
+
 def build_time_series(
     ticker: str,
     window_size: int = 30,
     prices_dir: Optional[Path] = None,
     sentiment_dir: Optional[Path] = None,
     output_dir: Optional[Path] = None,
+    freq: str = "1h",
+    normalize: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Build sliding-window arrays for a single ticker.
 
@@ -97,6 +110,8 @@ def build_time_series(
         prices_dir: Override for the raw prices directory.
         sentiment_dir: Override for the processed sentiment directory.
         output_dir: Override for the features output directory.
+        freq: Resampling frequency for timestamps ("1h", "1D", etc.).
+        normalize: If True, z-score every feature column per ticker.
 
     Returns:
         A tuple ``(X, y)`` where ``X`` has shape ``(N, window_size, n_features)``
@@ -112,8 +127,8 @@ def build_time_series(
         logger.warning("No price data for %s — returning empty arrays", ticker)
         return np.empty((0, window_size, len(FEATURE_COLUMNS))), np.empty((0,))
 
-    prices["timestamp"] = prices["timestamp"].dt.floor("1h")
-    sentiment = _aggregate_sentiment_hourly(_load_sentiment(s_dir))
+    prices["timestamp"] = prices["timestamp"].dt.floor(freq)
+    sentiment = _aggregate_sentiment(_load_sentiment(s_dir), freq=freq)
 
     merged = prices.merge(sentiment, on="timestamp", how="left")
     for col in ["avg_sentiment", "positive_ratio", "negative_ratio", "article_count"]:
@@ -121,6 +136,9 @@ def build_time_series(
 
     merged["direction"] = (merged["close"].shift(-1) > merged["close"]).astype(int)
     merged = merged.dropna(subset=["direction"]).reset_index(drop=True)
+
+    if normalize:
+        merged = _normalize_columns(merged, FEATURE_COLUMNS)
 
     feature_matrix = merged[FEATURE_COLUMNS].to_numpy(dtype=np.float32)
     targets = merged["direction"].to_numpy(dtype=np.int64)
