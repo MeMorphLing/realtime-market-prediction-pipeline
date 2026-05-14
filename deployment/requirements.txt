@@ -1,0 +1,6 @@
+# Minimal inference dependencies. No training or ingestion libraries.
+fastapi>=0.108.0
+uvicorn[standard]>=0.25.0
+pydantic>=2.5.0
+torch>=2.1.0
+numpy>=1.26.0
